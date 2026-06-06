@@ -1,0 +1,342 @@
+/* ===== 서울 1인가구 외로움 대시보드 — Modern Dark UI ===== */
+
+@import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap');
+
+/* ── Keyframes ─────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes gradientFlow {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+@keyframes borderPulse {
+  0%, 100% { border-color: rgba(99,102,241,0.25); }
+  50%       { border-color: rgba(99,102,241,0.55); }
+}
+@keyframes shimmerBar {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ── Base ───────────────────────────────────────────────── */
+html, body, [class*="css"] {
+  font-family: 'Nanum Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.main,
+[data-testid="stAppViewContainer"],
+[data-testid="stMainBlockContainer"] {
+  background-color: transparent !important;
+}
+
+/* ── Page entry animation ───────────────────────────────── */
+[data-testid="stMainBlockContainer"] > div > div {
+  animation: fadeInUp 0.45s ease both;
+}
+
+/* ── Typography ─────────────────────────────────────────── */
+h1 {
+  background: linear-gradient(120deg, #e2e8f0 0%, #a5b4fc 60%, #c084fc 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fadeInUp 0.4s ease both, gradientFlow 8s ease infinite;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em;
+}
+h2 { color: #c7d2fe !important; font-weight: 700 !important; }
+h3 { color: #a5b4fc !important; font-weight: 700 !important;
+     animation: fadeInUp 0.4s ease both; }
+h4 { color: #818cf8 !important; font-weight: 700 !important;
+     animation: fadeInUp 0.4s ease 0.05s both; }
+
+/* ── Homepage hero ─────────────────────────────────────── */
+.main-title {
+  font-size: 2.6rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff 0%, #818cf8 45%, #c084fc 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fadeInUp 0.5s ease both, gradientFlow 7s ease infinite;
+  margin-bottom: 0.3rem;
+  line-height: 1.2;
+}
+.sub-title {
+  font-size: 1.02rem;
+  color: #94a3b8;
+  margin-bottom: 1.8rem;
+  animation: fadeInUp 0.55s ease 0.08s both;
+}
+
+/* ── RQ Cards ───────────────────────────────────────────── */
+.rq-card {
+  background: rgba(22, 28, 48, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  border-radius: 16px;
+  padding: 1.2rem 1.1rem;
+  height: 100%;
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1),
+              box-shadow 0.28s ease,
+              border-color 0.28s ease;
+  animation: fadeInUp 0.5s ease both;
+}
+.rq-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(99, 102, 241, 0.65);
+  box-shadow: 0 14px 32px rgba(99, 102, 241, 0.18);
+}
+.rq-tag {
+  display: inline-block;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.71rem;
+  font-weight: 700;
+  padding: 0.18rem 0.7rem;
+  border-radius: 20px;
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+}
+.rq-q {
+  font-size: 0.91rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  line-height: 1.55;
+}
+
+/* ── Insight box ────────────────────────────────────────── */
+.insight-box {
+  position: relative;
+  background: linear-gradient(135deg,
+    rgba(251,146,60,0.07) 0%,
+    rgba(249,115,22,0.12) 100%);
+  border-left: 3px solid #f97316;
+  border-radius: 0 14px 14px 0;
+  padding: 1rem 1.3rem 1rem 1.5rem;
+  margin: 1.2rem 0;
+  color: #e2e8f0;
+  animation: slideInLeft 0.4s ease both;
+  overflow: hidden;
+}
+.insight-box::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(249,115,22,0.04) 100%);
+  pointer-events: none;
+}
+.insight-box b { color: #fb923c; }
+
+/* ── Stat / KPI cards (homepage) ────────────────────────── */
+.stat-card {
+  background: rgba(22, 28, 48, 0.7);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 14px;
+  padding: 1.1rem 1.3rem;
+  text-align: center;
+  transition: all 0.28s ease;
+  animation: fadeInUp 0.5s ease both;
+}
+.stat-card:hover {
+  border-color: rgba(99,102,241,0.6);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(99,102,241,0.15);
+}
+.stat-num {
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.1;
+}
+.stat-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.3rem;
+}
+
+/* ── Divider ─────────────────────────────────────────────── */
+hr {
+  margin: 1.8rem 0;
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(99,102,241,0.45) 50%, transparent 100%);
+}
+
+/* ── Dataframe (st.dataframe — 외부 CSS 제한적) ──────────── */
+[data-testid="stDataFrame"] {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(99,102,241,0.18) !important;
+  animation: fadeInUp 0.45s ease both;
+}
+
+/* ── Pandas Styler HTML tables (st.markdown unsafe_allow_html) ── */
+.stMarkdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  animation: fadeInUp 0.45s ease both;
+}
+.stMarkdown th {
+  background: rgba(99,102,241,0.12) !important;
+  color: #a5b4fc !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  padding: 0.5rem 0.85rem !important;
+  border-bottom: 2px solid rgba(99,102,241,0.3) !important;
+  white-space: nowrap;
+}
+.stMarkdown td {
+  text-align: center !important;
+  padding: 0.42rem 0.85rem !important;
+  color: #cbd5e1 !important;
+  border-bottom: 1px solid rgba(71,85,105,0.15) !important;
+}
+.stMarkdown td:first-child {
+  background: rgba(99,102,241,0.12) !important;
+  color: #a5b4fc !important;
+  font-weight: 700 !important;
+}
+.stMarkdown tr:nth-child(even) td {
+  background: rgba(15,23,42,0.25);
+}
+.stMarkdown tr:hover td {
+  background: rgba(99,102,241,0.07);
+}
+
+/* ── Matplotlib figure wrapper ──────────────────────────── */
+[data-testid="stImage"] {
+  border-radius: 14px;
+  overflow: hidden;
+  animation: fadeInUp 0.5s ease both;
+  border: 1px solid rgba(99,102,241,0.12);
+}
+
+/* ── Metrics ────────────────────────────────────────────── */
+[data-testid="stMetric"] {
+  background: rgba(22, 28, 48, 0.55);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 14px;
+  padding: 0.8rem 1rem !important;
+  transition: all 0.28s ease;
+  animation: fadeInUp 0.45s ease both;
+}
+[data-testid="stMetric"]:hover {
+  border-color: rgba(99,102,241,0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99,102,241,0.12);
+}
+[data-testid="stMetricValue"] {
+  color: #a5b4fc !important;
+  font-weight: 800 !important;
+}
+
+/* ── Sidebar ────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+  background: rgba(10, 14, 30, 0.88) !important;
+  backdrop-filter: blur(20px) !important;
+  border-right: 1px solid rgba(99,102,241,0.14) !important;
+}
+[data-testid="stSidebarNav"] a {
+  border-radius: 10px !important;
+  transition: background 0.2s ease, color 0.2s ease !important;
+  padding: 0.45rem 0.9rem !important;
+}
+[data-testid="stSidebarNav"] a:hover {
+  background: rgba(99,102,241,0.15) !important;
+}
+[data-testid="stSidebarNav"] [aria-selected="true"] {
+  background: rgba(99,102,241,0.25) !important;
+  color: #a5b4fc !important;
+}
+
+/* ── Radio buttons ──────────────────────────────────────── */
+.stRadio > div { gap: 0.5rem; }
+.stRadio > div > label {
+  border: 1px solid rgba(99,102,241,0.25) !important;
+  border-radius: 10px !important;
+  padding: 0.3rem 0.9rem !important;
+  transition: all 0.2s ease;
+  font-size: 0.87rem;
+}
+.stRadio > div > label:hover {
+  border-color: #6366f1 !important;
+  color: #a5b4fc !important;
+  background: rgba(99,102,241,0.08) !important;
+}
+
+/* ── Expander ───────────────────────────────────────────── */
+[data-testid="stExpander"] {
+  border: 1px solid rgba(99,102,241,0.2) !important;
+  border-radius: 14px !important;
+  animation: fadeInUp 0.5s ease both;
+  overflow: hidden;
+}
+[data-testid="stExpander"] summary {
+  font-weight: 700;
+  color: #a5b4fc;
+}
+
+/* ── Alert / Info ───────────────────────────────────────── */
+[data-testid="stAlert"] {
+  border-radius: 12px !important;
+  animation: fadeInUp 0.4s ease both;
+}
+[data-testid="stInfo"] {
+  border-left: 3px solid #818cf8 !important;
+  background: rgba(99,102,241,0.08) !important;
+  color: #c7d2fe !important;
+}
+
+/* ── Caption ────────────────────────────────────────────── */
+small, .stCaption, [data-testid="stCaptionContainer"] {
+  color: #64748b !important;
+  font-size: 0.93rem !important;
+}
+
+/* ── Shimmer accent bar (decorative) ────────────────────── */
+.accent-bar {
+  height: 3px;
+  background: linear-gradient(90deg,
+    #6366f1 0%, #8b5cf6 30%, #c084fc 60%, #6366f1 100%);
+  background-size: 200% 100%;
+  border-radius: 2px;
+  margin-bottom: 1.2rem;
+  animation: shimmerBar 3s linear infinite;
+}
+
+/* ── 레이아웃 고정 — 화면 크기·새로고침 무관 ──────────────── */
+/* Streamlit wide 모드에서 콘텐츠 영역을 고정 폭으로 묶어
+   첫 로드와 재로드 시 크기 차이를 없앤다.             */
+section[data-testid="stMain"] > div:first-child,
+.block-container,
+[data-testid="stMainBlockContainer"] {
+  max-width: 1160px !important;
+  min-width: 720px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding-left: 2.5rem !important;
+  padding-right: 2.5rem !important;
+  padding-top: 2rem !important;
+  box-sizing: border-box !important;
+}
