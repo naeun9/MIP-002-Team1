@@ -28,10 +28,15 @@
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
 }
+@keyframes chartReveal {
+  from { opacity: 0; transform: scale(0.95) translateY(14px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
 
 /* ── Base ───────────────────────────────────────────────── */
 html, body, [class*="css"] {
   font-family: 'Nanum Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 17px !important;
 }
 .main,
 [data-testid="stAppViewContainer"],
@@ -228,7 +233,7 @@ hr {
 [data-testid="stImage"] {
   border-radius: 14px;
   overflow: hidden;
-  animation: fadeInUp 0.5s ease both;
+  animation: chartReveal 0.65s cubic-bezier(0.34,1.56,0.64,1) both;
   border: 1px solid rgba(99,102,241,0.12);
 }
 
@@ -325,9 +330,21 @@ small, .stCaption, [data-testid="stCaptionContainer"] {
   animation: shimmerBar 3s linear infinite;
 }
 
+/* ── Type-colored card hover shadows ────────────────────── */
+.rq-card.card-a:hover {
+  border-color: rgba(99,102,241,0.72) !important;
+  box-shadow: 0 14px 32px rgba(99,102,241,0.32) !important;
+}
+.rq-card.card-b:hover {
+  border-color: rgba(100,116,139,0.72) !important;
+  box-shadow: 0 14px 32px rgba(100,116,139,0.32) !important;
+}
+.rq-card.card-c:hover {
+  border-color: rgba(248,113,113,0.72) !important;
+  box-shadow: 0 14px 32px rgba(248,113,113,0.32) !important;
+}
+
 /* ── 레이아웃 고정 — 화면 크기·새로고침 무관 ──────────────── */
-/* Streamlit wide 모드에서 콘텐츠 영역을 고정 폭으로 묶어
-   첫 로드와 재로드 시 크기 차이를 없앤다.             */
 section[data-testid="stMain"] > div:first-child,
 .block-container,
 [data-testid="stMainBlockContainer"] {

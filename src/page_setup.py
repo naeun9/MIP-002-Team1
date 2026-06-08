@@ -14,10 +14,6 @@ def inject_css():
 
 
 def page_header(title: str, caption: str = "", kpis: list = None, highlight_idx: int = None):
-    """
-    accent-bar + 그라데이션 타이틀 + 선택적 KPI 카드 행을 렌더링한다.
-    kpis = [("값", "레이블"), ...]  /  highlight_idx: 강조할 카드 인덱스
-    """
     inject_css()
     st.markdown('<div class="accent-bar"></div>', unsafe_allow_html=True)
     st.title(title)

@@ -17,10 +17,9 @@ if css.exists():
 
 # ===== 히어로 =====
 st.markdown('<div class="accent-bar"></div>', unsafe_allow_html=True)
-st.markdown('<div class="main-title">🏙️ 서울 1인가구와 외로움 분석</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">[서울 1인가구 외로움 지도]</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="sub-title">데이터로 읽는 한국 사회 — 변화와 미래 &nbsp;|&nbsp; '
-    'KGSS · 서울시 행정통계 · 서울복지실태조사</div>',
+    '<div class="sub-title">서울시 1인가구의 외로움 분석 대시보드</div>',
     unsafe_allow_html=True,
 )
 
@@ -88,13 +87,11 @@ for col, (tag, q, method) in zip(cols2, rqs_part2):
 st.markdown("---")
 st.info("👈 왼쪽 사이드바에서 각 분석 페이지(RQ1 ~ RQ5)를 확인하세요.")
 
-with st.expander("📊 데이터 출처 및 방법"):
+with st.expander("데이터 출처"):
     st.markdown("""
-    - **KGSS 한국종합사회조사** (누적, 2003~2025) — 사회관계망·외로움 *(DOI: 10.22687/KOSSDA-A1-CUM-0074-V1)*
+    - **KGSS 한국종합사회조사** (누적, 2003~2025)
     - **서울시 가구유형별 우울감** (2022·2024·2025)
     - **서울시 자치구별 우울 경험률** (2014~2023)
-    - **서울복지실태조사** (2024, 가구원) — UCLA 외로움 척도 회귀
+    - **서울복지실태조사** (2024, 가구원)
     - **서울시 자치구별 인구·1인가구** (2024)
-
-    모든 분석은 원본 데이터를 앱에서 직접 계산하여 재현 가능합니다.
     """)

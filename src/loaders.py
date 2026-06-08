@@ -104,12 +104,13 @@ def depression_household():
 # =====================================================
 @st.cache_data
 def welfare_loneliness_regression():
-    """청년/노년 외로움 영향요인 회귀 (표준화 계수 반환)"""
+    """청년/노년 외로움 영향요인 회귀 (접촉·지지망·소득·건강, 표준화 계수 반환)"""
     import statsmodels.formula.api as smf
 
     raw = pd.read_excel(DATA / "DATA_서울시민의 생활실태 및 복지욕구 조사_가구원 데이터_SI공개용.xlsx")
     d = pd.DataFrame()
 
+    # 종속: 외로움 (E3, 1~4)
     e3_rev = ["E3_1","E3_5","E3_6","E3_9","E3_10","E3_15","E3_16","E3_19","E3_20"]
     e3_fwd = ["E3_2","E3_3","E3_4","E3_7","E3_8","E3_11","E3_12","E3_13","E3_14","E3_18"]
     lone = raw[e3_fwd + e3_rev].apply(pd.to_numeric, errors="coerce")
@@ -118,36 +119,42 @@ def welfare_loneliness_regression():
         lone[c] = 5 - lone[c]
     d["loneliness"] = lone.mean(axis=1)
 
+    # 독립1: 접촉 빈도 (E1, 역코딩)
     e1 = raw[["E1_101","E1_102","E1_103","E1_104"]].apply(pd.to_numeric, errors="coerce")
     e1 = e1.where((e1 >= 1) & (e1 <= 5))
     d["contact"] = (6 - e1).mean(axis=1)
 
+    # 독립2: 사회적 지지망 (E2, 있다 개수)
     e2 = raw[["E2_1","E2_2","E2_3","E2_4","E2_5"]].apply(pd.to_numeric, errors="coerce")
     d["support_net"] = (e2 == 1).sum(axis=1)
 
-    b8 = pd.to_numeric(raw["B8"], errors="coerce").where(lambda x: (x>=1)&(x<=6))
-    d["status"] = 7 - b8
+    # 통제1: 소득 (B7 합산 → log)
+    b7 = raw[["B7_1","B7_2","B7_3","B7_4","B7_5","B7_6"]].apply(pd.to_numeric, errors="coerce")
+    income = b7.fillna(0).sum(axis=1)
+    d["income_log"] = np.log1p(income.where(income >= 0))
+
+    # 통제2: 건강 악화 (C1_1, 1~5, 클수록 나쁨)
+    health = pd.to_numeric(raw["C1_1"], errors="coerce")
+    d["health_bad"] = health.where((health >= 1) & (health <= 5))
 
     d["female"] = (pd.to_numeric(raw["A1_4"], errors="coerce") == 2).astype(int)
     d["age"] = 2024 - pd.to_numeric(raw["A1_5_1"], errors="coerce")
-    d = d.dropna(subset=["loneliness","contact","support_net","status","age"])
+    d = d.dropna(subset=["loneliness","contact","support_net","income_log","health_bad","age"])
     d = d[d["age"] >= 19]
 
+    keymap = {"접촉 빈도": "contact_z", "사회적 지지망": "support_net_z",
+              "소득(log)": "income_log_z", "건강 악화": "health_bad_z"}
     results = {}
     for grp, lo, hi in [("청년", 20, 39), ("노년", 65, 200)]:
         sub = d[(d["age"] >= lo) & (d["age"] <= hi)].copy()
-        for col in ["contact","support_net","status"]:
+        for col in ["contact","support_net","income_log","health_bad"]:
             sub[f"{col}_z"] = (sub[col]-sub[col].mean())/sub[col].std()
-        m = smf.ols("loneliness ~ contact_z + support_net_z + status_z + female",
+        m = smf.ols("loneliness ~ contact_z + support_net_z + income_log_z + health_bad_z + female",
                     data=sub).fit(cov_type="HC3")
         results[grp] = {
             "n": int(m.nobs),
-            "coef": {"접촉 빈도": m.params["contact_z"],
-                     "사회적 지지망": m.params["support_net_z"],
-                     "주관적 지위": m.params["status_z"]},
-            "pval": {"접촉 빈도": m.pvalues["contact_z"],
-                     "사회적 지지망": m.pvalues["support_net_z"],
-                     "주관적 지위": m.pvalues["status_z"]},
+            "coef": {lab: m.params[z] for lab, z in keymap.items()},
+            "pval": {lab: m.pvalues[z] for lab, z in keymap.items()},
             "r2": m.rsquared,
         }
     return results
@@ -237,8 +244,108 @@ def cluster_districts(k=3):
     df["정책방향"] = df["유형"].map(policy)
     return df
 
+@st.cache_data
+def oneperson_age_breakdown():
+    """1인가구 + 인구 데이터 → 서울 전체 연령대별 1인가구 현황 (2024)"""
+    one = _load_raw(DATA / "1인가구 수(연령대별)(2024).xlsx", 16)
+    pop = _load_raw(DATA / "서울시 자치구별 인구(연령대별) 2024.xlsx", 21)
+
+    one_s = one[one["gu"] == "소계"].iloc[0]
+    pop_s = pop[pop["gu"] == "소계"].iloc[0]
+
+    # 1인가구·인구 파일 공통 5세 단위 구간 (80~84세까지 매칭 가능)
+    age_bands = [
+        "20~24세", "25~29세", "30~34세", "35~39세",
+        "40~44세", "45~49세", "50~54세", "55~59세", "60~64세",
+        "65~69세", "70~74세", "75~79세", "80~84세",
+    ]
+    rows = []
+    for ab in age_bands:
+        ov = pd.to_numeric(one_s[ab], errors="coerce")
+        pv = pd.to_numeric(pop_s[ab], errors="coerce")
+        rows.append({"age": ab, "one": ov, "pop": pv,
+                     "rate": ov / pv * 100 if pv else np.nan})
+    df = pd.DataFrame(rows)
+
+    total_one = pd.to_numeric(one_s["소계"], errors="coerce")
+    df["share"] = df["one"] / total_one * 100
+
+    # 3그룹 집계
+    group_map = {
+        "청년\n(20~39세)":   ["20~24세", "25~29세", "30~34세", "35~39세"],
+        "중장년\n(40~64세)": ["40~44세", "45~49세", "50~54세", "55~59세", "60~64세"],
+        "노년\n(65세+)":     ["65~69세", "70~74세", "75~79세", "80~84세"],
+    }
+    grp_rows = []
+    for label, cols in group_map.items():
+        sub = df[df["age"].isin(cols)]
+        grp_rows.append({
+            "연령대":    label,
+            "1인가구수": sub["one"].sum(),
+            "평균율":    sub["rate"].mean(),
+            "구성비":    sub["share"].sum(),
+        })
+    grp_df = pd.DataFrame(grp_rows)
+
+    return df, grp_df, int(total_one)
+
+
+@st.cache_data
+def oneperson_timeseries():
+    """연도별(2022~2024) 서울 전체 1인가구 증가 추이 (연령 그룹별 인원·비율)"""
+    one_raw = pd.read_excel(DATA / "1인가구 수(연령대별)(2022-2024).xlsx",          sheet_name="데이터", header=None)
+    pop_raw = pd.read_excel(DATA / "서울시 자치구별 인구(연령대별)(2022-2024).xlsx", sheet_name="데이터", header=None)
+
+    ONE_N, POP_N = 16, 21  # 연도당 age 열 수
+
+    def _soegye(raw, year_idx, n_cols):
+        start   = 3 + year_idx * n_cols
+        labels  = raw.iloc[2, start:start + n_cols].tolist()
+        gu_vals = raw.iloc[3:, 1].ffill().values
+        sx_vals = raw.iloc[3:, 2].values
+        block   = raw.iloc[3:, start:start + n_cols].reset_index(drop=True)
+        block.columns = labels
+        mask = (pd.Series(gu_vals) == "소계") & (pd.Series(sx_vals) == "계")
+        row  = block.loc[mask.values].iloc[0]
+        return {c: pd.to_numeric(row[c], errors="coerce") for c in labels}
+
+    youth_bands  = ["20~24세", "25~29세", "30~34세", "35~39세"]
+    middle_bands = ["40~44세", "45~49세", "50~54세", "55~59세", "60~64세"]
+
+    rows = []
+    for yi, yr in enumerate([2022, 2023, 2024]):
+        one_d = _soegye(one_raw, yi, ONE_N)
+        pop_d = _soegye(pop_raw, yi, POP_N)
+
+        total_one = one_d["소계"]
+        total_pop = pop_d["소계"]
+
+        youth_one  = sum(one_d.get(b, 0) or 0 for b in youth_bands)
+        middle_one = sum(one_d.get(b, 0) or 0 for b in middle_bands)
+        sr_bands_o = [k for k in one_d if any(k.startswith(p) for p in ["65", "70", "75", "80", "85"])]
+        senior_one = sum(one_d.get(b, 0) or 0 for b in sr_bands_o)
+
+        youth_pop  = sum(pop_d.get(b, 0) or 0 for b in youth_bands)
+        middle_pop = sum(pop_d.get(b, 0) or 0 for b in middle_bands)
+        sr_bands_p = [k for k in pop_d if any(k.startswith(p) for p in ["65", "70", "75", "80", "85", "90", "95"])]
+        senior_pop = sum(pop_d.get(b, 0) or 0 for b in sr_bands_p)
+
+        rows.append({
+            "연도":     yr,
+            "총1인가구": int(total_one),
+            "청년":      int(youth_one),
+            "중장년":    int(middle_one),
+            "노년":      int(senior_one),
+            "1인가구율": total_one / total_pop * 100 if total_pop else np.nan,
+            "청년율":    youth_one  / youth_pop  * 100 if youth_pop  else np.nan,
+            "중장년율":  middle_one / middle_pop * 100 if middle_pop else np.nan,
+            "노년율":    senior_one / senior_pop * 100 if senior_pop else np.nan,
+        })
+
+    return pd.DataFrame(rows)
+
+
 def get_centered_df(df):
-    """모든 열을 가운데 정렬한 Pandas Styler를 반환한다."""
     return (
         df.style
         .set_properties(**{"text-align": "center"})

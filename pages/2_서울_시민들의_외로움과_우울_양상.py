@@ -11,7 +11,7 @@ from src.page_setup import page_header
 
 page_header(
     "RQ2 · 서울 시민의 외로움과 우울 양상",
-    caption="외로움 현황(KGSS 2023·2025) → 우울 경험률 추세(행정통계 2014~2023)",
+    caption="외로움 현황(KGSS 2023·2025) | 우울 경험률 추세(행정통계 2014~2023)",
     kpis=[
         ("4.8%",  "교제부족 '자주 이상' 비율"),
         ("8.4%",  "우울 경험률 최고치 (2023)"),
@@ -29,11 +29,10 @@ bars = ax.bar(lone["item"], lone["high_pct"],
 ax.bar_label(bars, fmt="%.1f%%", padding=4,
              color="#e2e8f0", fontsize=10, fontweight="bold")
 ax.set_ylabel("자주+매우 자주 (%)"); ax.set_ylim(0, 7)
-ax.set_title(f"외로움을 자주 이상 느낀 비율 (n={n})", fontweight="bold", pad=10)
+ax.set_title(f"해당 감정을 자주 이상 느낀 비율 (n={n})", fontweight="bold", pad=10)
 ax.grid(axis="y", alpha=0.4)
 fig.tight_layout()
 st.pyplot(fig, use_container_width=True)
-st.caption("교제 부족이 가장 높음 — 관계의 양적 부족이 질적 단절보다 먼저 나타남")
 
 lone_disp = lone.rename(columns={
     "item":     "외로움 항목",
@@ -55,7 +54,6 @@ st.markdown(styled_lone.to_html(), unsafe_allow_html=True)
 st.markdown("""
 <div class="insight-box">
 서울 시민이 가장 빈번하게 느끼는 외로움은 <b>교제·동반자 부족</b>입니다.
-관계의 질적 단절보다 <b>양적 부족</b>이 앞서 나타나는 점이 특징입니다.
 </div>
 """, unsafe_allow_html=True)
 
@@ -81,7 +79,5 @@ st.pyplot(fig, use_container_width=True)
 st.markdown("""
 <div class="insight-box">
 서울 우울 경험률은 2018년 최저(5.1%)에서 2023년 <b>최고(8.4%)</b>로 상승했습니다.
-코로나 이후 사회관계망 축소와 맞물려 우울 수준이 구조적으로 높아진 양상입니다.
-</div>
+코로나 이후 사회관계망 축소와 맞물려 우울 수준이 구조적으로 높아진 양상입니다.</div>
 """, unsafe_allow_html=True)
-st.caption("외로움 현황과는 출처·주기가 달라 겹쳐 해석하지 않음. → 가구유형별 차이는 RQ3에서 심층 분석")

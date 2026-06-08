@@ -27,7 +27,7 @@ page_header(
 )
 
 st.markdown("""
-RQ2에서 확인한 서울 전체 우울 상승이 **가구 유형에 따라 다르게 나타나는지** 검토합니다.
+RQ2에서 확인한 서울 전체 우울 상승이 **가구 유형에 따라 다르게 나타나는지** 검토합니다.\n
 엑셀 원본에는 **1인가구·부부가구·2세대이상가구·기타가구** 4개 유형이 있습니다.
 """)
 
@@ -45,9 +45,9 @@ w       = 0.26
 COLORS  = ["#94a3b8", "#818cf8", "#f87171"]
 
 fig, ax = plt.subplots(figsize=(10, 5))
-b0 = ax.bar(x - w,   y2022, w, label="2022 경험(%)",   color=COLORS[0])
-b1 = ax.bar(x,       y2024, w, label="2024 우울(%)",   color=COLORS[1])
-b2 = ax.bar(x + w,   y2025, w, label="2025 느낀다(%)", color=COLORS[2])
+b0 = ax.bar(x - w,   y2022, w, label="2022 우울감 경험 여부(%)",   color=COLORS[0])
+b1 = ax.bar(x,       y2024, w, label="2024 우울감 정도(%)",   color=COLORS[1])
+b2 = ax.bar(x + w,   y2025, w, label="2025 우울감을 느낀다(%)", color=COLORS[2])
 for bars in [b0, b1, b2]:
     ax.bar_label(bars, fmt="%.1f", padding=3,
                  color="#cbd5e1", fontsize=9, fontweight="bold")
@@ -94,11 +94,12 @@ st.markdown("---")
 st.markdown("### 원본 수치 (기타가구 포함)")
 disp = df.rename(columns={
     "가구형태":    "가구형태",
-    "2022_경험":  "2022 경험(%)",
-    "2024_우울":  "2024 우울(%)",
-    "2025_느낀다": "2025 느낀다(%)",
+    "2022_경험":  "2022 우울감 경험 여부(%)",
+    "2024_우울":  "2024 우울감 정도(%)",
+    "2025_느낀다": "2025 우울감을 느낀다(%)",
 })
-_num_cols_rq3 = ["2022 경험(%)", "2024 우울(%)", "2025 느낀다(%)"]
+_num_cols_rq3 = ["2022 우울감 경험 여부(%)", "2024 우울감 정도(%)", "2025 우울감을 느낀다(%)"]
+
 styled_rq3 = (
     disp.style
     .format({c: "{:g}" for c in _num_cols_rq3})
@@ -120,5 +121,3 @@ st.markdown("""
 혼자 거주한다는 사실 자체가 우울의 <b>구조적·지속적 위험 요인</b>임을 확인합니다.
 </div>
 """, unsafe_allow_html=True)
-
-st.caption("→ 외로움 원인의 연령대별 차이는 RQ3-1에서 분석합니다.")
