@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 sys.path.append(str(Path(__file__).parent.parent))
-from src.loaders import load_districts, get_centered_df
+from src.loaders import load_districts, rank_districts, get_centered_df
 from src.page_setup import page_header
 
 df   = load_districts()
@@ -29,7 +29,7 @@ with c1:
     <div style="font-weight:700; color:#a5b4fc; margin-bottom:0.5rem;">
     🏆 1인가구 절대수 Top 5</div>
     """, unsafe_allow_html=True)
-    top_n = df.nlargest(5, "one_total")[["district", "one_total"]].copy()
+    top_n = rank_districts("one_total", 5)
     top_n.columns = ["자치구", "1인가구 수"]
     styled_n = (
         top_n.style
@@ -47,7 +47,7 @@ with c2:
     <div style="font-weight:700; color:#a5b4fc; margin-bottom:0.5rem;">
     🏆 인구 대비 비율 Top 5 (%)</div>
     """, unsafe_allow_html=True)
-    top_r = df.nlargest(5, "rate_total")[["district", "rate_total"]].copy()
+    top_r = rank_districts("rate_total", 5)
     top_r.columns = ["자치구", "1인가구율"]
     styled_r = (
         top_r.style
