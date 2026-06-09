@@ -1,7 +1,13 @@
 """
-데이터 로딩 + 분석 계산 모듈
-모든 함수는 @st.cache로 캐싱되어 재실행 시 빠름.
-원본 데이터(data/)를 읽어 앱에서 직접 계산 → 재현성 확보.
+데이터 로딩 + 분석 모듈 (SQL 기반)
+
+[설계]
+  원본 정제는 build_db.py 가 끝내고 seoul.db 에 적재한다.
+  이 모듈의 각 함수는 seoul.db 에 SQL 쿼리를 던져 집계·결합·랭킹을 수행한다.
+  → 구간 중간값 매핑, 연령대 그룹핑, 비율·구성비 산출, 자치구 JOIN 까지 모두 SQL.
+  → 통계 모델(OLS 회귀, K-means)만 입력을 SQL 로 뽑은 뒤 Python 으로 적합한다.
+
+  seoul.db 가 없으면 build_db.main() 을 자동 호출해 1회 생성한다.
 """
 import streamlit as st
 import pandas as pd
@@ -10,62 +16,84 @@ import sqlite3
 from pathlib import Path
 
 DATA = Path(__file__).parent.parent / "data"
+DB_PATH = DATA / "seoul.db"
 
-# KGSS 결측 코드
-MISSING = [-8, -1, 8, 9, 88, 99, -9]
-def clean(s):
-    return s.where(~s.isin(MISSING))
+# 연령대 그룹 정의 (SQL IN 절에 주입)
+YOUTH  = ["20~24세", "25~29세", "30~34세", "35~39세"]
+MIDDLE = ["40~44세", "45~49세", "50~54세", "55~59세", "60~64세"]
+SENIOR_ONE = ["65~69세", "70~74세", "75~79세", "80~84세", "85세이상"]
+SENIOR_POP = ["65~69세", "70~74세", "75~79세", "80~84세",
+              "85~89세", "90~94세", "95세 이상+"]
+# oneperson_age_breakdown 전용 — 1인가구·인구 공통 매칭 가능한 5세 구간(80~84세까지)
+AGE13 = ["20~24세", "25~29세", "30~34세", "35~39세",
+         "40~44세", "45~49세", "50~54세", "55~59세", "60~64세",
+         "65~69세", "70~74세", "75~79세", "80~84세"]
+
+
+def _q(s):
+    """리스트 → SQL IN 절 문자열  ['a','b'] → "'a','b'" """
+    return ",".join(f"'{x}'" for x in s)
+
+
+def get_conn():
+    """seoul.db 연결 (없으면 build_db 로 생성)"""
+    if not DB_PATH.exists():
+        import sys
+        sys.path.append(str(Path(__file__).parent.parent))
+        import build_db
+        build_db.main()
+    return sqlite3.connect(DB_PATH)
 
 
 # =====================================================
-# RQ1 · RQ2도입 : KGSS
+# RQ1 · RQ2 도입 : KGSS  (구간 중간값 매핑 → SQL CASE WHEN)
 # =====================================================
-@st.cache_data
-def load_kgss():
-    """KGSS parquet (서울만)"""
-    df = pd.read_parquet(DATA / "kgss.parquet")
-    return df[df["REGION"] == 1].copy()
-
-
 @st.cache_data
 def kgss_network_timeseries():
-    """RQ1 — 비가족 접촉·이웃 관계 시계열 (2012·2016·2023)"""
-    df = load_kgss()
-    CONTACT_MID = {1:0, 2:1.5, 3:3.5, 4:7, 5:14.5, 6:34.5, 7:74.5, 8:100}
-    NGH_MID     = {1:0, 2:1.5, 3:3.5, 4:7, 5:10}
-
-    rows = []
-    for yr in [2012, 2016, 2023]:
-        sub = df[df["YEAR"] == yr]
-        rec = {"year": yr}
-        cb = clean(sub["CONTACTB"]).map(CONTACT_MID)
-        rec["contactb"] = cb.mean()
-        if yr in [2012, 2023]:
-            rec["nghgrt"] = clean(sub["NGHGRT"]).map(NGH_MID).mean()
-            rec["nghask"] = clean(sub["NGHASK"]).map(NGH_MID).mean()
-        else:
-            rec["nghgrt"] = np.nan
-            rec["nghask"] = np.nan
-        rows.append(rec)
-    return pd.DataFrame(rows)
+    """RQ1 — 비가족 접촉·이웃 관계 시계열 (2012·2016·2023)
+    구간형 응답을 중간값(명)으로 환산하여 연도별 평균. 매핑·집계 모두 SQL."""
+    contact_case = """CASE CONTACTB
+        WHEN 1 THEN 0 WHEN 2 THEN 1.5 WHEN 3 THEN 3.5 WHEN 4 THEN 7
+        WHEN 5 THEN 14.5 WHEN 6 THEN 34.5 WHEN 7 THEN 74.5 WHEN 8 THEN 100 END"""
+    ngh_case = lambda col: f"""CASE {col}
+        WHEN 1 THEN 0 WHEN 2 THEN 1.5 WHEN 3 THEN 3.5 WHEN 4 THEN 7 WHEN 5 THEN 10 END"""
+    sql = f"""
+        SELECT YEAR AS year,
+               AVG({contact_case}) AS contactb,
+               CASE WHEN YEAR IN (2012, 2023) THEN AVG({ngh_case('NGHGRT')}) END AS nghgrt,
+               CASE WHEN YEAR IN (2012, 2023) THEN AVG({ngh_case('NGHASK')}) END AS nghask
+        FROM kgss_seoul
+        WHERE YEAR IN (2012, 2016, 2023)
+        GROUP BY YEAR
+        ORDER BY YEAR;
+    """
+    with get_conn() as conn:
+        return pd.read_sql(sql, conn)
 
 
 @st.cache_data
 def kgss_loneliness_status():
-    """RQ2 도입① — 외로움 현황 (2023·2025)"""
-    df = load_kgss()
-    sub = df[df["YEAR"].isin([2023, 2025])].copy()
-    items = {"LONE4WKS": "교제 부족", "ISOL4WKS": "고립감", "LEFT4WKS": "소외감"}
-    rows = []
-    for var, lab in items.items():
-        s = clean(sub[var])
-        rows.append({
-            "item": lab,
-            "mean": s.mean(),
-            "high_pct": (s >= 4).mean() * 100,
-        })
-    n = clean(sub[list(items)]).mean(axis=1).notna().sum()
-    return pd.DataFrame(rows), int(n)
+    """RQ2 도입① — 외로움 현황 (2023·2025)
+    mean = 유효응답 평균 / high_pct = 전체 응답 중 '자주(4)+매우자주' 비율."""
+    items = [("LONE4WKS", "교제 부족"), ("ISOL4WKS", "고립감"), ("LEFT4WKS", "소외감")]
+    selects = []
+    for var, _ in items:
+        selects.append(f"AVG({var}) AS {var}_mean")
+        selects.append(
+            f"SUM(CASE WHEN {var} >= 4 THEN 1.0 ELSE 0 END) * 100.0 / COUNT(*) AS {var}_high"
+        )
+    sql = f"""
+        SELECT {', '.join(selects)},
+               COUNT(CASE WHEN LONE4WKS IS NOT NULL OR ISOL4WKS IS NOT NULL
+                            OR LEFT4WKS IS NOT NULL THEN 1 END) AS n_valid
+        FROM kgss_seoul
+        WHERE YEAR IN (2023, 2025);
+    """
+    with get_conn() as conn:
+        r = pd.read_sql(sql, conn).iloc[0]
+    rows = [{"item": lab, "mean": r[f"{var}_mean"], "high_pct": r[f"{var}_high"]}
+            for var, lab in items]
+    return pd.DataFrame(rows), int(r["n_valid"])
 
 
 # =====================================================
@@ -74,83 +102,49 @@ def kgss_loneliness_status():
 @st.cache_data
 def depression_trend():
     """RQ2 도입② — 서울 전체 우울 경험률 추세 (2014~2023)"""
-    raw = pd.read_excel(DATA / "서울시 자치구별 우울감 경험률(2014-2023).xlsx", sheet_name="데이터", header=None)
-    cols = {y: c for y, c in zip(range(2014, 2024), [2,5,8,11,14,17,20,23,26,29])}
-    vals = raw.iloc[2, list(cols.values())].apply(pd.to_numeric, errors="coerce")
-    return pd.Series(vals.values, index=list(cols.keys()), name="우울경험률")
+    with get_conn() as conn:
+        df = pd.read_sql("SELECT year, rate FROM depression_trend ORDER BY year;", conn)
+    return pd.Series(df["rate"].values, index=df["year"].astype(int).values, name="우울경험률")
 
 
 @st.cache_data
 def depression_household():
-    """RQ3 — 가구유형별 우울 (2022·2024·2025), 엑셀 직접 파싱"""
-    raw = pd.read_excel(
-        DATA / "서울시 가구 유형별 우울감 정도(2022, 2024, 2025).xlsx",
-        header=None,
-    )
-    # row 14~17: 1인/부부/2세대이상/기타, col 3=2022경험, 7=2024우울, 11=2025느낀다
-    rows    = [14, 15, 16, 17]
-    labels  = ["1인가구", "부부가구", "2세대이상가구", "기타가구"]
-    c2022, c2024, c2025 = 3, 7, 11
-    return pd.DataFrame({
-        "가구형태":    labels,
-        "2022_경험":  [float(raw.iat[r, c2022]) for r in rows],
-        "2024_우울":  [float(raw.iat[r, c2024]) for r in rows],
-        "2025_느낀다": [float(raw.iat[r, c2025]) for r in rows],
+    """RQ3 — 가구유형별 우울 (2022·2024·2025)"""
+    with get_conn() as conn:
+        df = pd.read_sql(
+            "SELECT household_type, y2022, y2024, y2025 FROM depression_household;", conn
+        )
+    return df.rename(columns={
+        "household_type": "가구형태",
+        "y2022": "2022_경험", "y2024": "2024_우울", "y2025": "2025_느낀다",
     })
 
 
 # =====================================================
 # 외로움 회귀 : 서울복지실태조사 2024
+#   변수 정제는 DB(welfare 테이블)에서 완료 → 표준화·OLS만 Python
 # =====================================================
 @st.cache_data
 def welfare_loneliness_regression():
-    """청년/노년 외로움 영향요인 회귀 (접촉·지지망·소득·건강, 표준화 계수 반환)"""
+    """청년/노년 외로움 영향요인 회귀 (표준화 계수). 입력은 welfare 테이블에서 SQL 조회."""
     import statsmodels.formula.api as smf
-
-    raw = pd.read_excel(DATA / "DATA_서울시민의 생활실태 및 복지욕구 조사_가구원 데이터_SI공개용.xlsx")
-    d = pd.DataFrame()
-
-    # 종속: 외로움 (E3, 1~4)
-    e3_rev = ["E3_1","E3_5","E3_6","E3_9","E3_10","E3_15","E3_16","E3_19","E3_20"]
-    e3_fwd = ["E3_2","E3_3","E3_4","E3_7","E3_8","E3_11","E3_12","E3_13","E3_14","E3_18"]
-    lone = raw[e3_fwd + e3_rev].apply(pd.to_numeric, errors="coerce")
-    lone = lone.where((lone >= 1) & (lone <= 4))
-    for c in e3_rev:
-        lone[c] = 5 - lone[c]
-    d["loneliness"] = lone.mean(axis=1)
-
-    # 독립1: 접촉 빈도 (E1, 역코딩)
-    e1 = raw[["E1_101","E1_102","E1_103","E1_104"]].apply(pd.to_numeric, errors="coerce")
-    e1 = e1.where((e1 >= 1) & (e1 <= 5))
-    d["contact"] = (6 - e1).mean(axis=1)
-
-    # 독립2: 사회적 지지망 (E2, 있다 개수)
-    e2 = raw[["E2_1","E2_2","E2_3","E2_4","E2_5"]].apply(pd.to_numeric, errors="coerce")
-    d["support_net"] = (e2 == 1).sum(axis=1)
-
-    # 통제1: 소득 (B7 합산 → log)
-    b7 = raw[["B7_1","B7_2","B7_3","B7_4","B7_5","B7_6"]].apply(pd.to_numeric, errors="coerce")
-    income = b7.fillna(0).sum(axis=1)
-    d["income_log"] = np.log1p(income.where(income >= 0))
-
-    # 통제2: 건강 악화 (C1_1, 1~5, 클수록 나쁨)
-    health = pd.to_numeric(raw["C1_1"], errors="coerce")
-    d["health_bad"] = health.where((health >= 1) & (health <= 5))
-
-    d["female"] = (pd.to_numeric(raw["A1_4"], errors="coerce") == 2).astype(int)
-    d["age"] = 2024 - pd.to_numeric(raw["A1_5_1"], errors="coerce")
-    d = d.dropna(subset=["loneliness","contact","support_net","income_log","health_bad","age"])
-    d = d[d["age"] >= 19]
 
     keymap = {"접촉 빈도": "contact_z", "사회적 지지망": "support_net_z",
               "소득(log)": "income_log_z", "건강 악화": "health_bad_z"}
     results = {}
     for grp, lo, hi in [("청년", 20, 39), ("노년", 65, 200)]:
-        sub = d[(d["age"] >= lo) & (d["age"] <= hi)].copy()
-        for col in ["contact","support_net","income_log","health_bad"]:
-            sub[f"{col}_z"] = (sub[col]-sub[col].mean())/sub[col].std()
-        m = smf.ols("loneliness ~ contact_z + support_net_z + income_log_z + health_bad_z + female",
-                    data=sub).fit(cov_type="HC3")
+        with get_conn() as conn:
+            sub = pd.read_sql(
+                "SELECT loneliness, contact, support_net, income_log, health_bad, female "
+                "FROM welfare WHERE age >= ? AND age <= ?;",
+                conn, params=(lo, hi),
+            )
+        for col in ["contact", "support_net", "income_log", "health_bad"]:
+            sub[f"{col}_z"] = (sub[col] - sub[col].mean()) / sub[col].std()
+        m = smf.ols(
+            "loneliness ~ contact_z + support_net_z + income_log_z + health_bad_z + female",
+            data=sub,
+        ).fit(cov_type="HC3")
         results[grp] = {
             "n": int(m.nobs),
             "coef": {lab: m.params[z] for lab, z in keymap.items()},
@@ -161,78 +155,100 @@ def welfare_loneliness_regression():
 
 
 # =====================================================
-# RQ3 · RQ4 : 자치구 (SQL JOIN + K-means)
+# RQ4 · RQ5 : 자치구 (SQL JOIN + K-means)
 # =====================================================
-def _load_raw(path, n_age_cols):
-    df = pd.read_excel(path, sheet_name="데이터", header=None)
-    age_labels = df.iloc[2, 3:3+n_age_cols].tolist()
-    df = df.iloc[3:].reset_index(drop=True)
-    df.columns = ["gu1", "gu", "sex"] + age_labels
-    df["gu1"] = df["gu1"].ffill()
-    df["gu"]  = df["gu"].ffill()
-    df = df[df["sex"] == "계"].copy()
-    for c in age_labels:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    return df
+@st.cache_data
+def load_districts():
+    """RQ4 — 자치구 분석 마트(district_metrics) 조회. 인구⨝1인가구 JOIN·비율/구성비는
+    build_db.py 가 마트 테이블로 미리 적재한다."""
+    with get_conn() as conn:
+        return pd.read_sql(
+            "SELECT district, one_youth, one_middle, one_senior, one_total, pop_total, "
+            "rate_youth, rate_middle, rate_senior, rate_total, "
+            "share_youth, share_middle, share_senior "
+            "FROM district_metrics ORDER BY seq;",
+            conn,
+        )
+
+
+# =====================================================
+# 핵심 SQL 분석 : 정제된 마트로 '질문에 답하는' 쿼리
+# =====================================================
+@st.cache_data
+def rank_districts(metric="rate_total", n=5, ascending=False):
+    """자치구 랭킹 (밀집도·절대수 등). ORDER BY … LIMIT 로 Top/Bottom N 추출."""
+    assert metric in {"rate_total", "rate_youth", "rate_middle", "rate_senior",
+                       "one_total", "share_youth", "share_senior"}
+    order = "ASC" if ascending else "DESC"
+    with get_conn() as conn:
+        return pd.read_sql(
+            f"SELECT district, {metric} FROM district_metrics "
+            f"ORDER BY {metric} {order} LIMIT {n};",
+            conn,
+        )
 
 
 @st.cache_data
-def load_districts():
-    """RQ3 — 인구 ⨝ 1인가구 SQL JOIN → 비율·구성비 변수"""
-    one_df = _load_raw(DATA / "1인가구 수(연령대별)(2024).xlsx", 16)
-    pop_df = _load_raw(DATA / "서울시 자치구별 인구(연령대별) 2024.xlsx", 21)
-    one_df = one_df[one_df["gu"] != "소계"].rename(columns={"gu":"district"}).drop(columns=["gu1","sex"])
-    pop_df = pop_df[pop_df["gu"] != "소계"].rename(columns={"gu":"district"}).drop(columns=["gu1","sex"])
+def scale_vs_density():
+    """규모 vs 밀집 괴리 — 절대수 1위와 밀집도 1위가 다름을 한 쿼리로 대비.
+    각 지표의 순위를 윈도우 함수로 매겨 상위 5개를 나란히 본다."""
+    sql = """
+        WITH ranked AS (
+            SELECT district, one_total, rate_total,
+                   RANK() OVER (ORDER BY one_total  DESC) AS rank_scale,
+                   RANK() OVER (ORDER BY rate_total DESC) AS rank_density
+            FROM district_metrics
+        )
+        SELECT district, one_total, rank_scale, rate_total, rank_density
+        FROM ranked
+        WHERE rank_scale <= 5 OR rank_density <= 5
+        ORDER BY rank_density;
+    """
+    with get_conn() as conn:
+        return pd.read_sql(sql, conn)
 
-    one_map = {"youth":["20~24세","25~29세","30~34세","35~39세"],
-               "middle":["40~44세","45~49세","50~54세","55~59세","60~64세"],
-               "senior":["65~69세","70~74세","75~79세","80~84세","85세이상"]}
-    pop_map = {"youth":["20~24세","25~29세","30~34세","35~39세"],
-               "middle":["40~44세","45~49세","50~54세","55~59세","60~64세"],
-               "senior":["65~69세","70~74세","75~79세","80~84세","85~89세","90~94세","95세 이상+"]}
 
-    one_agg = pd.DataFrame({"district": one_df["district"].values})
-    for k, cols in one_map.items():
-        one_agg[f"one_{k}"] = one_df[cols].sum(axis=1).values
-    one_agg["one_total"] = one_df["소계"].values
+@st.cache_data
+def youth_senior_contrast(n=5):
+    """청년 밀집 상위 구 vs 노년 밀집 상위 구 — '밀집=청년 동네' 공간 구조 확인."""
+    with get_conn() as conn:
+        youth = pd.read_sql(
+            f"SELECT district, rate_youth FROM district_metrics "
+            f"ORDER BY rate_youth DESC LIMIT {n};", conn)
+        senior = pd.read_sql(
+            f"SELECT district, rate_senior FROM district_metrics "
+            f"ORDER BY rate_senior DESC LIMIT {n};", conn)
+    return youth, senior
 
-    pop_agg = pd.DataFrame({"district": pop_df["district"].values})
-    for k, cols in pop_map.items():
-        pop_agg[f"pop_{k}"] = pop_df[cols].sum(axis=1).values
-    pop_agg["pop_total"] = pop_df["소계"].values
 
-    conn = sqlite3.connect(":memory:")
-    one_agg.to_sql("one_raw", conn, if_exists="replace", index=False)
-    pop_agg.to_sql("pop_raw", conn, if_exists="replace", index=False)
-    df = pd.read_sql("""
-        SELECT o.district, o.one_youth, o.one_middle, o.one_senior, o.one_total,
-               p.pop_total,
-               ROUND(o.one_youth *100.0/p.pop_youth, 2)  AS rate_youth,
-               ROUND(o.one_middle*100.0/p.pop_middle,2)  AS rate_middle,
-               ROUND(o.one_senior*100.0/p.pop_senior,2)  AS rate_senior,
-               ROUND(o.one_total *100.0/p.pop_total, 2)  AS rate_total,
-               ROUND(o.one_youth *100.0/o.one_total, 2)  AS share_youth,
-               ROUND(o.one_middle*100.0/o.one_total, 2)  AS share_middle,
-               ROUND(o.one_senior*100.0/o.one_total, 2)  AS share_senior
-        FROM one_raw o JOIN pop_raw p ON o.district = p.district;
-    """, conn)
-    conn.close()
-    return df
+@st.cache_data
+def household_depression_gap():
+    """가구유형별 우울 격차 (2025) — 1인가구가 타 가구의 몇 배인지 SQL 로 산출.
+    측정방식이 이질적인 기타가구는 제외."""
+    sql = """
+        SELECT household_type, y2025,
+               ROUND(y2025 / (SELECT y2025 FROM depression_household
+                              WHERE household_type = '부부가구'), 2) AS ratio_vs_couple
+        FROM depression_household
+        WHERE household_type != '기타가구'
+        ORDER BY y2025 DESC;
+    """
+    with get_conn() as conn:
+        return pd.read_sql(sql, conn)
 
 
 @st.cache_data
 def cluster_districts(k=3):
-    """RQ4 — K-means 자치구 유형화 (연령 구성비 기반)"""
+    """RQ5 — K-means 자치구 유형화 (연령 구성비 기반). 입력은 SQL, 군집만 Python."""
     from sklearn.preprocessing import StandardScaler
     from sklearn.cluster import KMeans
 
     df = load_districts().copy()
-    X = df[["share_youth","share_middle","share_senior"]].values
+    X = df[["share_youth", "share_middle", "share_senior"]].values
     Xs = StandardScaler().fit_transform(X)
     km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(Xs)
     df["cluster"] = km.labels_
 
-    # 청년 구성비 평균으로 유형명 부여 (높은순: 청년밀집 / 중간: 세대균형 / 낮은: 중장년·노년)
     order = df.groupby("cluster")["share_youth"].mean().sort_values(ascending=False).index.tolist()
     names = {order[0]: "청년밀집형", order[1]: "세대혼합형", order[2]: "중장년·노년형"}
     policy = {
@@ -244,36 +260,31 @@ def cluster_districts(k=3):
     df["정책방향"] = df["유형"].map(policy)
     return df
 
+
 @st.cache_data
 def oneperson_age_breakdown():
-    """1인가구 + 인구 데이터 → 서울 전체 연령대별 1인가구 현황 (2024)"""
-    one = _load_raw(DATA / "1인가구 수(연령대별)(2024).xlsx", 16)
-    pop = _load_raw(DATA / "서울시 자치구별 인구(연령대별) 2024.xlsx", 21)
-
-    one_s = one[one["gu"] == "소계"].iloc[0]
-    pop_s = pop[pop["gu"] == "소계"].iloc[0]
-
-    # 1인가구·인구 파일 공통 5세 단위 구간 (80~84세까지 매칭 가능)
-    age_bands = [
-        "20~24세", "25~29세", "30~34세", "35~39세",
-        "40~44세", "45~49세", "50~54세", "55~59세", "60~64세",
-        "65~69세", "70~74세", "75~79세", "80~84세",
-    ]
-    rows = []
-    for ab in age_bands:
-        ov = pd.to_numeric(one_s[ab], errors="coerce")
-        pv = pd.to_numeric(pop_s[ab], errors="coerce")
-        rows.append({"age": ab, "one": ov, "pop": pv,
-                     "rate": ov / pv * 100 if pv else np.nan})
-    df = pd.DataFrame(rows)
-
-    total_one = pd.to_numeric(one_s["소계"], errors="coerce")
+    """서울 전체 연령대별 1인가구 현황 (2024). 소계 행 기준 SQL JOIN 집계."""
+    sql = f"""
+        SELECT o.age_band AS age, o.value AS one, p.value AS pop,
+               o.value * 100.0 / p.value AS rate
+        FROM one_2024 o JOIN pop_2024 p ON o.age_band = p.age_band
+        WHERE o.district = '소계' AND p.district = '소계'
+          AND o.age_band IN ({_q(AGE13)});
+    """
+    with get_conn() as conn:
+        df = pd.read_sql(sql, conn)
+        total_one = pd.read_sql(
+            "SELECT value FROM one_2024 WHERE district='소계' AND age_band='소계';", conn
+        ).iat[0, 0]
+    # AGE13 순서 보장
+    df["age"] = pd.Categorical(df["age"], categories=AGE13, ordered=True)
+    df = df.sort_values("age").reset_index(drop=True)
+    df["age"] = df["age"].astype(str)
     df["share"] = df["one"] / total_one * 100
 
-    # 3그룹 집계
     group_map = {
-        "청년\n(20~39세)":   ["20~24세", "25~29세", "30~34세", "35~39세"],
-        "중장년\n(40~64세)": ["40~44세", "45~49세", "50~54세", "55~59세", "60~64세"],
+        "청년\n(20~39세)":   YOUTH,
+        "중장년\n(40~64세)": MIDDLE,
         "노년\n(65세+)":     ["65~69세", "70~74세", "75~79세", "80~84세"],
     }
     grp_rows = []
@@ -285,64 +296,43 @@ def oneperson_age_breakdown():
             "평균율":    sub["rate"].mean(),
             "구성비":    sub["share"].sum(),
         })
-    grp_df = pd.DataFrame(grp_rows)
-
-    return df, grp_df, int(total_one)
+    return df, pd.DataFrame(grp_rows), int(total_one)
 
 
 @st.cache_data
 def oneperson_timeseries():
-    """연도별(2022~2024) 서울 전체 1인가구 증가 추이 (연령 그룹별 인원·비율)"""
-    one_raw = pd.read_excel(DATA / "1인가구 수(연령대별)(2022-2024).xlsx",          sheet_name="데이터", header=None)
-    pop_raw = pd.read_excel(DATA / "서울시 자치구별 인구(연령대별)(2022-2024).xlsx", sheet_name="데이터", header=None)
-
-    ONE_N, POP_N = 16, 21  # 연도당 age 열 수
-
-    def _soegye(raw, year_idx, n_cols):
-        start   = 3 + year_idx * n_cols
-        labels  = raw.iloc[2, start:start + n_cols].tolist()
-        gu_vals = raw.iloc[3:, 1].ffill().values
-        sx_vals = raw.iloc[3:, 2].values
-        block   = raw.iloc[3:, start:start + n_cols].reset_index(drop=True)
-        block.columns = labels
-        mask = (pd.Series(gu_vals) == "소계") & (pd.Series(sx_vals) == "계")
-        row  = block.loc[mask.values].iloc[0]
-        return {c: pd.to_numeric(row[c], errors="coerce") for c in labels}
-
-    youth_bands  = ["20~24세", "25~29세", "30~34세", "35~39세"]
-    middle_bands = ["40~44세", "45~49세", "50~54세", "55~59세", "60~64세"]
-
-    rows = []
-    for yi, yr in enumerate([2022, 2023, 2024]):
-        one_d = _soegye(one_raw, yi, ONE_N)
-        pop_d = _soegye(pop_raw, yi, POP_N)
-
-        total_one = one_d["소계"]
-        total_pop = pop_d["소계"]
-
-        youth_one  = sum(one_d.get(b, 0) or 0 for b in youth_bands)
-        middle_one = sum(one_d.get(b, 0) or 0 for b in middle_bands)
-        sr_bands_o = [k for k in one_d if any(k.startswith(p) for p in ["65", "70", "75", "80", "85"])]
-        senior_one = sum(one_d.get(b, 0) or 0 for b in sr_bands_o)
-
-        youth_pop  = sum(pop_d.get(b, 0) or 0 for b in youth_bands)
-        middle_pop = sum(pop_d.get(b, 0) or 0 for b in middle_bands)
-        sr_bands_p = [k for k in pop_d if any(k.startswith(p) for p in ["65", "70", "75", "80", "85", "90", "95"])]
-        senior_pop = sum(pop_d.get(b, 0) or 0 for b in sr_bands_p)
-
-        rows.append({
-            "연도":     yr,
-            "총1인가구": int(total_one),
-            "청년":      int(youth_one),
-            "중장년":    int(middle_one),
-            "노년":      int(senior_one),
-            "1인가구율": total_one / total_pop * 100 if total_pop else np.nan,
-            "청년율":    youth_one  / youth_pop  * 100 if youth_pop  else np.nan,
-            "중장년율":  middle_one / middle_pop * 100 if middle_pop else np.nan,
-            "노년율":    senior_one / senior_pop * 100 if senior_pop else np.nan,
-        })
-
-    return pd.DataFrame(rows)
+    """연도별(2022~2024) 서울 전체 1인가구 추이 (연령 그룹별 인원·비율). 소계 행 SQL 집계."""
+    one_sql = f"""
+        SELECT year,
+            SUM(CASE WHEN age_band = '소계'              THEN value END) AS total_one,
+            SUM(CASE WHEN age_band IN ({_q(YOUTH)})      THEN value END) AS youth_one,
+            SUM(CASE WHEN age_band IN ({_q(MIDDLE)})     THEN value END) AS middle_one,
+            SUM(CASE WHEN age_band IN ({_q(SENIOR_ONE)}) THEN value END) AS senior_one
+        FROM one_ts WHERE district = '소계' GROUP BY year ORDER BY year;
+    """
+    pop_sql = f"""
+        SELECT year,
+            SUM(CASE WHEN age_band = '소계'              THEN value END) AS total_pop,
+            SUM(CASE WHEN age_band IN ({_q(YOUTH)})      THEN value END) AS youth_pop,
+            SUM(CASE WHEN age_band IN ({_q(MIDDLE)})     THEN value END) AS middle_pop,
+            SUM(CASE WHEN age_band IN ({_q(SENIOR_POP)}) THEN value END) AS senior_pop
+        FROM pop_ts WHERE district = '소계' GROUP BY year ORDER BY year;
+    """
+    with get_conn() as conn:
+        o = pd.read_sql(one_sql, conn)
+        p = pd.read_sql(pop_sql, conn)
+    m = o.merge(p, on="year")
+    return pd.DataFrame({
+        "연도":     m["year"].astype(int),
+        "총1인가구": m["total_one"].astype(int),
+        "청년":      m["youth_one"].astype(int),
+        "중장년":    m["middle_one"].astype(int),
+        "노년":      m["senior_one"].astype(int),
+        "1인가구율": m["total_one"]  / m["total_pop"]  * 100,
+        "청년율":    m["youth_one"]  / m["youth_pop"]  * 100,
+        "중장년율":  m["middle_one"] / m["middle_pop"] * 100,
+        "노년율":    m["senior_one"] / m["senior_pop"] * 100,
+    })
 
 
 def get_centered_df(df):
