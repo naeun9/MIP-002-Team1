@@ -1,8 +1,6 @@
-/* ===== 서울 1인가구 외로움 대시보드 — Modern Dark UI ===== */
-
 @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap');
 
-/* ── Keyframes ─────────────────────────────────────────── */
+/* Keyframes */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(18px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -33,7 +31,7 @@
   to   { opacity: 1; transform: scale(1)    translateY(0); }
 }
 
-/* ── Base ───────────────────────────────────────────────── */
+/* Base */
 html, body, [class*="css"] {
   font-family: 'Nanum Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 17px !important;
@@ -44,12 +42,12 @@ html, body, [class*="css"] {
   background-color: transparent !important;
 }
 
-/* ── Page entry animation ───────────────────────────────── */
+/* Page entry animation*/
 [data-testid="stMainBlockContainer"] > div > div {
   animation: fadeInUp 0.45s ease both;
 }
 
-/* ── Typography ─────────────────────────────────────────── */
+/* Typography */
 h1 {
   background: linear-gradient(120deg, #e2e8f0 0%, #a5b4fc 60%, #c084fc 100%);
   background-size: 200% 200%;
@@ -66,7 +64,7 @@ h3 { color: #a5b4fc !important; font-weight: 700 !important;
 h4 { color: #818cf8 !important; font-weight: 700 !important;
      animation: fadeInUp 0.4s ease 0.05s both; }
 
-/* ── Homepage hero ─────────────────────────────────────── */
+/*  Homepage hero */
 .main-title {
   font-size: 2.6rem;
   font-weight: 800;
@@ -86,7 +84,7 @@ h4 { color: #818cf8 !important; font-weight: 700 !important;
   animation: fadeInUp 0.55s ease 0.08s both;
 }
 
-/* ── RQ Cards ───────────────────────────────────────────── */
+/* RQ Cards */
 .rq-card {
   background: rgba(22, 28, 48, 0.65);
   backdrop-filter: blur(14px);
@@ -124,7 +122,7 @@ h4 { color: #818cf8 !important; font-weight: 700 !important;
   line-height: 1.55;
 }
 
-/* ── Insight box ────────────────────────────────────────── */
+/* Insight box*/
 .insight-box {
   position: relative;
   background: linear-gradient(135deg,
@@ -148,7 +146,7 @@ h4 { color: #818cf8 !important; font-weight: 700 !important;
 }
 .insight-box b { color: #fb923c; }
 
-/* ── Stat / KPI cards (homepage) ────────────────────────── */
+/* Stat / KPI cards */
 .stat-card {
   background: rgba(22, 28, 48, 0.7);
   border: 1px solid rgba(99, 102, 241, 0.2);
@@ -178,7 +176,7 @@ h4 { color: #818cf8 !important; font-weight: 700 !important;
   margin-top: 0.3rem;
 }
 
-/* ── Divider ─────────────────────────────────────────────── */
+/* Divider */
 hr {
   margin: 1.8rem 0;
   border: none;
@@ -187,7 +185,7 @@ hr {
     transparent 0%, rgba(99,102,241,0.45) 50%, transparent 100%);
 }
 
-/* ── Dataframe (st.dataframe — 외부 CSS 제한적) ──────────── */
+/* Dataframe*/
 [data-testid="stDataFrame"] {
   border-radius: 12px !important;
   overflow: hidden !important;
@@ -195,7 +193,7 @@ hr {
   animation: fadeInUp 0.45s ease both;
 }
 
-/* ── Pandas Styler HTML tables (st.markdown unsafe_allow_html) ── */
+/* Pandas Styler HTML tables*/
 .stMarkdown table {
   width: 100%;
   border-collapse: collapse;
@@ -229,7 +227,7 @@ hr {
   background: rgba(99,102,241,0.07);
 }
 
-/* ── Matplotlib figure wrapper ──────────────────────────── */
+/* Matplotlib figure wrapper */
 [data-testid="stImage"] {
   border-radius: 14px;
   overflow: hidden;
@@ -237,7 +235,7 @@ hr {
   border: 1px solid rgba(99,102,241,0.12);
 }
 
-/* ── Metrics ────────────────────────────────────────────── */
+/* Metrics */
 [data-testid="stMetric"] {
   background: rgba(22, 28, 48, 0.55);
   border: 1px solid rgba(99,102,241,0.2);
@@ -256,7 +254,7 @@ hr {
   font-weight: 800 !important;
 }
 
-/* ── Sidebar ────────────────────────────────────────────── */
+/* Sidebar*/
 [data-testid="stSidebar"] {
   background: rgba(10, 14, 30, 0.88) !important;
   backdrop-filter: blur(20px) !important;
@@ -275,7 +273,7 @@ hr {
   color: #a5b4fc !important;
 }
 
-/* ── Radio buttons ──────────────────────────────────────── */
+/* Radio buttons */
 .stRadio > div { gap: 0.5rem; }
 .stRadio > div > label {
   border: 1px solid rgba(99,102,241,0.25) !important;
@@ -290,7 +288,7 @@ hr {
   background: rgba(99,102,241,0.08) !important;
 }
 
-/* ── Expander ───────────────────────────────────────────── */
+/* Expander */
 [data-testid="stExpander"] {
   border: 1px solid rgba(99,102,241,0.2) !important;
   border-radius: 14px !important;
@@ -302,7 +300,7 @@ hr {
   color: #a5b4fc;
 }
 
-/* ── Alert / Info ───────────────────────────────────────── */
+/* Alert / Info */
 [data-testid="stAlert"] {
   border-radius: 12px !important;
   animation: fadeInUp 0.4s ease both;
@@ -313,13 +311,13 @@ hr {
   color: #c7d2fe !important;
 }
 
-/* ── Caption ────────────────────────────────────────────── */
+/* Caption */
 small, .stCaption, [data-testid="stCaptionContainer"] {
   color: #64748b !important;
   font-size: 0.93rem !important;
 }
 
-/* ── Shimmer accent bar (decorative) ────────────────────── */
+/* Shimmer accent bar */
 .accent-bar {
   height: 3px;
   background: linear-gradient(90deg,
@@ -330,7 +328,7 @@ small, .stCaption, [data-testid="stCaptionContainer"] {
   animation: shimmerBar 3s linear infinite;
 }
 
-/* ── Type-colored card hover shadows ────────────────────── */
+/* Type-colored card hover shadows */
 .rq-card.card-a:hover {
   border-color: rgba(99,102,241,0.72) !important;
   box-shadow: 0 14px 32px rgba(99,102,241,0.32) !important;
@@ -344,7 +342,7 @@ small, .stCaption, [data-testid="stCaptionContainer"] {
   box-shadow: 0 14px 32px rgba(248,113,113,0.32) !important;
 }
 
-/* ── 레이아웃 고정 — 화면 크기·새로고침 무관 ──────────────── */
+/* 레이아웃 고정*/
 section[data-testid="stMain"] > div:first-child,
 .block-container,
 [data-testid="stMainBlockContainer"] {
