@@ -1,4 +1,3 @@
-"""각 RQ 페이지 공통 초기화 — CSS 주입 + 헤더 렌더링"""
 import streamlit as st
 from pathlib import Path
 
