@@ -45,9 +45,6 @@ python build_db.py
 streamlit run HOME.py
 ```
 
-> `seoul.db` 가 없으면 앱 첫 실행 시 자동으로 `build_db.main()` 이 호출되어 생성됩니다.
-> 빌드된 `seoul.db` 는 DB Browser for SQLite 로 열어 테이블·스키마를 직접 확인할 수 있습니다.
-
 ## 데이터베이스 테이블
 
 | 테이블 | 내용 | 형식 |
@@ -71,7 +68,6 @@ streamlit run HOME.py
 - **서울시 자치구별 1인가구** (2022·2023·2024) : https://data.seoul.go.kr/dataList/10995/S/2/datasetView.do
 - 자치구 경계: [southkorea/seoul-maps](https://github.com/southkorea/seoul-maps)
 
-모든 분석은 원본 데이터를 정제해 SQLite DB로 적재한 뒤 SQL로 계산하여 재현 가능합니다.
 
 ## 폴더 구조
 
