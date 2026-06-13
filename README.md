@@ -72,10 +72,10 @@ streamlit run HOME.py
 ## 폴더 구조
 
 ```
-├── build_db.py             # ETL: 원본 → seoul.db 구축
-├── HOME.py                 # 메인 진입점 (RQ 네비게이션)
-├── pages/                  # 분석 페이지 (1~7)
-├── src/loaders.py          # SQL 기반 데이터 로딩·분석 (캐싱)
-├── data/                   # 원본(xlsx·parquet·geojson) + seoul.db
-└── assets/style.css        # 스타일
+├── build_db.py
+├── HOME.py
+├── pages/
+├── src/loaders.py
+├── data/
+└── assets/style.css
 ```
