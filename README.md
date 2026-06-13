@@ -72,10 +72,15 @@ streamlit run HOME.py
 ## 폴더 구조
 
 ```
+├── .streamlit/         # Streamlit 설정
+├── assets/             # style.css
+├── data/               # 데이터 및 SQLite DB
+├── pages/              # 분석 페이지 (RQ1~RQ3-1)
+├── src/                # 공통 모듈
+├── .gitignore
+├── HOME.py             # 메인 진입점
 ├── build_db.py
-├── HOME.py
-├── pages/
-├── src/loaders.py
-├── data/
-└── assets/style.css
+├── packages.txt
+├── requirements.txt
+└── runtime.txt
 ```
